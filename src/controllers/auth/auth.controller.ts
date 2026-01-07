@@ -43,7 +43,7 @@ export const registerHandler = async (req: Request, res: Response) => {
             process.env.JWT_ACCESS_SECRET!,
             { expiresIn: "1d" }
         );
-        const verifyLink = `${getAppUrl}/verify-email?token=${verifyToken}`;
+        const verifyLink = `${getAppUrl()}/auth/verify-email?token=${verifyToken}`;
         await sendEmail(
             newUser.email,
             "Verify your email",
