@@ -5,7 +5,12 @@ export const createAccessToken = (userId: string, role: string, tokenVersion: nu
 
 }
 
-export const createRefreshToken = (userId: string, tokenVersion: number) => { 
+export const createRefreshToken = (userId: string, tokenVersion: number) => {
     const payload = { sub: userId, tokenVersion };
     return jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, { expiresIn: "7d" });
 }
+export const verifyRefreshHandler = (token: string) => {
+    return jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as {
+        sub: string; tokenVersion: number
+    };
+} 

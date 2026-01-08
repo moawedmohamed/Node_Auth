@@ -4,7 +4,7 @@ import { User } from "../../models/user.model";
 import { checkPassword, hashPassword } from "../../lib/hash";
 import jwt from "jsonwebtoken";
 import { sendEmail } from "../../lib/email";
-import { createAccessToken, createRefreshToken } from "../../lib/token";
+import { createAccessToken, createRefreshToken, verifyRefreshHandler } from "../../lib/token";
 
 function getAppUrl() {
     return process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
@@ -135,6 +135,47 @@ export const loginHandler = async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error("Login error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const refreshHandler = async (req: Request, res: Response) => {
+    try {
+        const token = req.cookies.refreshToken as string | undefined;
+        if (!token) {
+            return res.status(401).json({
+                message: "Missing refresh token"
+            });
+        }
+        const payload = verifyRefreshHandler(token);
+        const user = await User.findById(payload.sub);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        if (user.tokenVersion !== payload.tokenVersion) {
+            return res.status(401).json({ message: "Refresh Token invalid" });
+        }
+        const newAccessToken = createAccessToken(user.id, user.role, user.tokenVersion);
+        const newRefreshToken = createRefreshToken(user.id, user.tokenVersion);
+        const isProd = process.env.NODE_ENV === "production";
+        res.cookie("refreshToken", newRefreshToken, {
+            httpOnly: true,
+            secure: isProd,
+            sameSite: isProd ? "strict" : "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        })
+        return res.status(200).json({
+            message: "Login successful", newAccessToken, user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                isEmailVerified: user.isEmailVerified,
+                twoFactorEnabled: user.twoFactorEnabled,
+            }
+        });
+    } catch (error) {
+        console.error("Token refresh error:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 }
