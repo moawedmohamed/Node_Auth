@@ -9,7 +9,6 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
     }
     const host = process.env.SMTP_HOST;
     const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587;
-    console.log(port);
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASSWORD;
     const from = process.env.EMAIL_FROM

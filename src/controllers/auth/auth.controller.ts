@@ -3,6 +3,7 @@ import { loginSchema, registerSchema } from "./auth.schema";
 import { User } from "../../models/user.model";
 import { checkPassword, hashPassword } from "../../lib/hash";
 import jwt from "jsonwebtoken";
+import crypto from 'crypto';
 import { sendEmail } from "../../lib/email";
 import { createAccessToken, createRefreshToken, verifyRefreshHandler } from "../../lib/token";
 
@@ -187,3 +188,44 @@ export const logoutHandler = async (_req: Request, res: Response) => {
     res.status(200).json({ message: "logged out " })
 }
 
+export const forgetPassword = async (req: Request, res: Response) => {
+    const { email } = req.body as { email?: string };
+    if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+    }
+    const normalizedEmail = email.toLowerCase().trim();
+    try {
+        const user = await User.findOne({ email: normalizedEmail });
+        if (!user) {
+            return res.json({ message: "if this user account exist , we will send you a reset link" });
+        }
+        const rawTOken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(rawTOken).digest('hex');
+        user.resetPasswordToken = tokenHash;
+        user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000);
+        await user.save();
+        const resetUrl = `${getAppUrl()}/auth/reset-password?token=${rawTOken}`
+
+        await sendEmail(
+            user.email,
+            "Reset your password",
+            `
+                <p>Hello,</p>
+
+                <p>You requested to reset your password.</p>
+
+                <p>
+                    <a href="${resetUrl}">Reset your password</a>
+                </p>
+
+                <p>If you did not request this, please ignore this email.</p>
+                `
+        );
+
+        return res.json({ message: "if this user account exist , we will send you a reset link" });
+
+    } catch (error) {
+        console.error("Token refresh error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
