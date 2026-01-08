@@ -179,3 +179,11 @@ export const refreshHandler = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error" });
     }
 }
+
+export const logoutHandler = async (_req: Request, res: Response) => {
+    res.clearCookie("refreshToken", {
+        path: '/', httpOnly: true
+    });
+    res.status(200).json({ message: "logged out " })
+}
+
