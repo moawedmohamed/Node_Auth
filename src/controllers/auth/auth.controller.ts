@@ -111,7 +111,20 @@ export const loginHandler = async (req: Request, res: Response) => {
             return res.status(401).json({ message: "Invalid email or password" });
         }
         if (!user.isEmailVerified) {
-            return res.status(403).json({ message: "Email is not verified" });
+            const accessToken = createAccessToken(user._id.toString(), user.role, user.tokenVersion, true);
+
+            return res.status(200).json({
+                message: "Email is not verified. Please verify your email to unlock full access.",
+                accessToken,
+                user: {
+                    id: user._id,
+                    email: user.email,
+                    name: user.name,
+                    role: user.role,
+                    isEmailVerified: user.isEmailVerified,
+                    twoFactorEnabled: user.twoFactorEnabled,
+                }
+            });
         }
 
         const accessToken = createAccessToken(user._id.toString(), user.role, user.tokenVersion);
@@ -215,7 +228,7 @@ export const forgetPassword = async (req: Request, res: Response) => {
                 <p>You requested to reset your password.</p>
 
                 <p>
-                    <a href="${resetUrl}">Reset your password</a>
+                    <a href="${resetUrl}">${resetUrl}</a>
                 </p>
 
                 <p>If you did not request this, please ignore this email.</p>
@@ -223,6 +236,33 @@ export const forgetPassword = async (req: Request, res: Response) => {
         );
 
         return res.json({ message: "if this user account exist , we will send you a reset link" });
+
+    } catch (error) {
+        console.error("Token refresh error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const resetPasswordHandler = async (req: Request, res: Response) => {
+    const { token, password } = req.body as { token?: string; password?: string };
+    if (!token) {
+        return res.status(400).json({ message: "Reset token is missing " });
+    }
+    if (!password || password.length < 6)
+        return res.status(400).json({ message: "password atLeast be 6 char long  " });
+    try {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const user = await User.findOne({ resetPasswordToken: tokenHash, resetPasswordExpires: { $gt: new Date() } });
+        if (!user) {
+            return res.status(400).json({ message: "Invalid or expired Token" });
+        }
+        const newPasswordHash = await hashPassword(password);
+        user.password = newPasswordHash;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        user.tokenVersion = user.tokenVersion + 1;
+        await user.save();
+        return res.json({ message: "password reset successfully" })
 
     } catch (error) {
         console.error("Token refresh error:", error);
