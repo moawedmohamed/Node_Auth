@@ -17,6 +17,7 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
         const authReq = req as any;
         authReq.user = {
             id: user.id,
+            name: user.name,
             email: user.email,
             role: user.role,
             isEmailVerified: user.isEmailVerified
