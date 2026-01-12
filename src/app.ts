@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import authRouter from './routes/auth.route';
 import morgan from 'morgan';
 import userRouter from './routes/user.routes';
+import adminRouter from './routes/admin.route';
+
 dotenv.config();
 
 const app = express();
@@ -16,5 +18,6 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 app.use('/auth', authRouter);
 app.use('/user', userRouter);
+app.use('/admin', adminRouter);
 export default app;
 // Connect to Database

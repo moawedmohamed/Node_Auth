@@ -1,15 +1,7 @@
-import { Request, Response, Router } from "express";
+import { Response, Router } from "express";
 import requireAuth from "../middleware/requireAuth";
-interface userInfo {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    isEmailVerified: boolean
-}
-export interface AuthRequest extends Request {
-    user?: userInfo;
-}
+import { AuthRequest } from "../interface";
+
 const userRouter = Router();
 userRouter.get('/me', requireAuth, (req: AuthRequest, res: Response) => {
     return res.json({ user: req.user })

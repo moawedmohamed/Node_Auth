@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import dotenv from 'dotenv';
+dotenv.config();
 import { loginSchema, registerSchema } from "./auth.schema";
 import { User } from "../../models/user.model";
 import { checkPassword, hashPassword } from "../../lib/hash";
@@ -6,11 +8,23 @@ import jwt from "jsonwebtoken";
 import crypto from 'crypto';
 import { sendEmail } from "../../lib/email";
 import { createAccessToken, createRefreshToken, verifyRefreshHandler } from "../../lib/token";
-
+import { OAuth2Client } from 'google-auth-library'
 function getAppUrl() {
     return process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
 }
 
+export const getGoogleClient = () => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUrl = process.env.GOOGLE_REDIRECT_URL;
+    if (!clientId || !clientSecret)
+        throw Error("Google client Id and secret id both are missing")
+    return new OAuth2Client({
+        client_id: clientId,
+        clientSecret: clientSecret,
+        redirectUri: redirectUrl
+    })
+}
 export const registerHandler = async (req: Request, res: Response) => {
     try {
         const result = registerSchema.safeParse(req.body);
@@ -266,6 +280,21 @@ export const resetPasswordHandler = async (req: Request, res: Response) => {
 
     } catch (error) {
         console.error("Token refresh error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const googleAuthStartHandler = (_req: Request, res: Response) => {
+    try {
+        const client = getGoogleClient();
+        const url = client.generateAuthUrl({
+            access_type: 'offline',
+            prompt: 'consent',
+            scope: ['openid', 'email', 'profile']
+        })
+        return res.redirect(url);
+    } catch (error) {
+        console.error("googleAuthStartHandler error:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 }
