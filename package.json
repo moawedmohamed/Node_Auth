@@ -14,6 +14,7 @@
   "packageManager": "pnpm@10.28.0",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
@@ -22,10 +23,12 @@
     "mongoose": "^9.1.2",
     "morgan": "^1.10.1",
     "nodemailer": "^7.0.12",
+    "otplib": "^13.1.1",
     "zod": "^4.3.5"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
