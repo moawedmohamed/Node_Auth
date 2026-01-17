@@ -9,6 +9,9 @@ import crypto from 'crypto';
 import { sendEmail } from "../../lib/email";
 import { createAccessToken, createRefreshToken, verifyRefreshHandler } from "../../lib/token";
 import { OAuth2Client } from 'google-auth-library'
+import { AuthRequest } from "../../interface";
+import { generateSecret, generateURI } from 'otplib';
+
 function getAppUrl() {
     return process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
 }
@@ -114,7 +117,7 @@ export const loginHandler = async (req: Request, res: Response) => {
                 errors: result.error.flatten(),
             });
         }
-        const { email, password } = result.data;
+        const { email, password, twoFactorCode } = result.data;
         const normalizedEmail = email.toLowerCase().trim();
         const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
@@ -126,7 +129,6 @@ export const loginHandler = async (req: Request, res: Response) => {
         }
         if (!user.isEmailVerified) {
             const accessToken = createAccessToken(user._id.toString(), user.role, user.tokenVersion, true);
-
             return res.status(200).json({
                 message: "Email is not verified. Please verify your email to unlock full access.",
                 accessToken,
@@ -140,9 +142,22 @@ export const loginHandler = async (req: Request, res: Response) => {
                 }
             });
         }
+        if (user.twoFactorEnabled) {
+            if (!twoFactorCode || typeof (twoFactorCode) !== 'string') {
+                res.status(400).json({
+                    message: "towFactorCode is required",
+                })
+            }
+            if (!user.twoFactorSecret) {
+                return res.status(400).json({
+                    message: "Two factor misconfigured for this account"
+                })
+            }
+            // **verify code with otplib
 
-        const accessToken = createAccessToken(user._id.toString(), user.role, user.tokenVersion);
-        const refreshToken = createRefreshToken(user._id.toString(), user.tokenVersion);
+        }
+        const accessToken = createAccessToken(user.id.toString(), user.role, user.tokenVersion);
+        const refreshToken = createRefreshToken(user.id.toString(), user.tokenVersion);
 
         const isProd = process.env.NODE_ENV === "production";
         res.cookie("refreshToken", refreshToken, {
@@ -363,6 +378,72 @@ export const googleAuthCallbackHandler = async (req: Request, res: Response) => 
         })
     } catch (error) {
         console.error("googleAuthStartHandler error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const twoFactorSetupHandler = async (req: AuthRequest, res: Response) => {
+    const authUser = req.user;
+    if (!authUser) {
+        return res.status(401).json({
+            message: "Not authenticated"
+        })
+    }
+    try {
+        const user = await User.findById(authUser.id)
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            })
+        }
+        const secret = generateSecret();
+        const issuer = 'NodeAuthApp';
+        const otpAuthUrl = generateURI({
+            label: user.email,
+            issuer,
+            secret
+        });
+        user.twoFactorSecret = secret;
+        user.twoFactorEnabled = true
+        return res.json({
+            message: "2FA setup is done",
+            otpAuthUrl,
+            secret
+        })
+    } catch (error) {
+        console.error("twoFactorSetupHandler error:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const twoFactorVerifyHandler = async (req: AuthRequest, res: Response) => {
+    const authUser = req.user;
+    if (!authUser) {
+        return res.status(401).json({
+            message: "Not authenticated"
+        })
+    }
+    const { code } = req.body as { code?: string }
+    if (!code) {
+        return res.status(400).json({
+            message: "two factor is required"
+        })
+    }
+    const user = await User.findById(authUser.id)
+    if (!user) {
+        return res.status(404).json({
+            message: "User not found"
+        })
+    }
+    if (!user.twoFactorSecret) {
+        return res.status(400).json({
+            message: "you don't have the2fa setup yet"
+        })
+    }
+    try {
+
+    } catch (error) {
+        console.error("twoFactorVerifyHandler error:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 }

@@ -3,7 +3,9 @@ import { verifyAccessToken } from "../lib/token";
 import { User } from "../models/user.model";
 
 const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+    console.log('first', req.headers);
     const authHeader = req.headers.authorization;
+    console.log(authHeader)
     if (!authHeader || !authHeader.startsWith("Bearer "))
         return res.status(401).json({ message: "you are not auth user " })
     const token = authHeader?.split(" ")[1];

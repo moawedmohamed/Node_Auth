@@ -2,8 +2,9 @@ import { Router } from "express";
 import {
     forgetPassword, googleAuthCallbackHandler, googleAuthStartHandler,
     loginHandler, logoutHandler, refreshHandler,
-    registerHandler, resetPasswordHandler, verifyEmailHandler
+    registerHandler, resetPasswordHandler, twoFactorSetupHandler, verifyEmailHandler
 } from "../controllers/auth/auth.controller";
+import requireAuth from "../middleware/requireAuth";
 
 
 const router = Router();
@@ -17,4 +18,5 @@ router.post('/forget-password', forgetPassword);
 router.post('/reset-password', resetPasswordHandler);
 router.get('/google', googleAuthStartHandler);
 router.get('/google/callback', googleAuthCallbackHandler);
+router.post('/2fa/setup', requireAuth, twoFactorSetupHandler);
 export default router;
