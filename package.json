@@ -26,6 +26,7 @@
     "nodemailer": "^7.0.12",
     "otplib": "^13.1.1",
     "qrcode": "^1.5.4",
+    "ts-node": "^10.9.2",
     "zod": "^4.3.5"
   },
   "devDependencies": {

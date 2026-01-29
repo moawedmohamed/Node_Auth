@@ -10,7 +10,7 @@ import { sendEmail } from "../../lib/email";
 import { createAccessToken, createRefreshToken, verifyRefreshHandler } from "../../lib/token";
 import { OAuth2Client } from 'google-auth-library'
 import { AuthRequest } from "../../interface";
-import { generateSecret, generateURI } from 'otplib';
+import { generateSecret, generateURI, verify } from 'otplib';
 
 function getAppUrl() {
     return process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
@@ -144,7 +144,7 @@ export const loginHandler = async (req: Request, res: Response) => {
         }
         if (user.twoFactorEnabled) {
             if (!twoFactorCode || typeof (twoFactorCode) !== 'string') {
-                res.status(400).json({
+                return res.status(400).json({
                     message: "towFactorCode is required",
                 })
             }
@@ -154,7 +154,13 @@ export const loginHandler = async (req: Request, res: Response) => {
                 })
             }
             // **verify code with otplib
-
+            const isValidCode = await verify({
+                token: twoFactorCode, secret: user.twoFactorSecret
+            })
+            console.log(isValidCode);
+            if (!isValidCode.valid) {
+                return res.status(401).json({ message: "Invalid two-factor code" });
+            }
         }
         const accessToken = createAccessToken(user.id.toString(), user.role, user.tokenVersion);
         const refreshToken = createRefreshToken(user.id.toString(), user.tokenVersion);
@@ -330,7 +336,7 @@ export const googleAuthCallbackHandler = async (req: Request, res: Response) => 
             audience: process.env.GOOGLE_CLIENT_ID as string
         })
         const payload = ticket.getPayload();
-        const email = payload?.email,
+        const email = payload?.email;
         const emailVerified = payload?.email_verified
 
         if (!emailVerified) {
@@ -373,7 +379,8 @@ export const googleAuthCallbackHandler = async (req: Request, res: Response) => 
                 id: user.id,
                 email: user.email,
                 role: user.role,
-                isEmailVerified: user.isEmailVerified
+                isEmailVerified: user.isEmailVerified,
+                // twoFactorSecret:user.twoFactorSecret
             }
         })
     } catch (error) {
@@ -404,7 +411,8 @@ export const twoFactorSetupHandler = async (req: AuthRequest, res: Response) => 
             secret
         });
         user.twoFactorSecret = secret;
-        user.twoFactorEnabled = true
+        user.twoFactorEnabled = false;
+        await user.save();
         return res.json({
             message: "2FA setup is done",
             otpAuthUrl,
@@ -418,6 +426,7 @@ export const twoFactorSetupHandler = async (req: AuthRequest, res: Response) => 
 
 export const twoFactorVerifyHandler = async (req: AuthRequest, res: Response) => {
     const authUser = req.user;
+    console.log(authUser)
     if (!authUser) {
         return res.status(401).json({
             message: "Not authenticated"
@@ -440,8 +449,18 @@ export const twoFactorVerifyHandler = async (req: AuthRequest, res: Response) =>
             message: "you don't have the2fa setup yet"
         })
     }
-    try {
 
+    try {
+        const isValid = verify({
+            token: code,
+            secret: user.twoFactorSecret
+        })
+        if (!isValid) {
+            return res.status(401).json({ message: "Invalid two-factor code" });
+        }
+        user.twoFactorEnabled = true;
+        await user.save()
+        return res.json({ message: "2FA verified successfully", twoFactorEnabled: true });
     } catch (error) {
         console.error("twoFactorVerifyHandler error:", error);
         return res.status(500).json({ message: "Internal server error" });
